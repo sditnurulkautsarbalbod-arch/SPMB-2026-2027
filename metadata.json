@@ -1,0 +1,5 @@
+{
+  "name": "SPMB Pendaftaran Online",
+  "description": "Formulir Pendaftaran Siswa Baru dengan fitur auto-save, validasi, dan responsive design.",
+  "requestFramePermissions": []
+}
