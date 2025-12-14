@@ -17,7 +17,7 @@ import {
 
 // --- CONFIGURATION ---
 // PASTE YOUR GOOGLE WEB APP URL HERE
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwVlY27ZFIuY7ayAfOb_nVBxmkGs0JE7jU3fbiTaOrYa9YNqUZnBsoAazioBuQUVcEa/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz44rE7G6ysA5mU4SQs6CgWp4U2QD8wf1XxB5bkhVp0NsLTSlnGLe-e9xuHgGynOYtK/exec"; 
 
 const STORAGE_KEY = 'spmb_form_data';
 const DASHBOARD_CACHE_KEY = 'spmb_dashboard_cache'; // Key untuk cache dashboard
@@ -121,16 +121,47 @@ function App() {
 
     setIsLoadingDashboard(true);
     try {
-      const response = await fetch(GOOGLE_SCRIPT_URL);
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setSubmissions(data);
-        // Simpan ke LocalStorage setiap kali berhasil fetch
-        localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(data));
+      console.log("Fetching dashboard data...");
+      // UPDATE: Tambahkan redirect follow agar fetch request ke GAS berhasil
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'GET',
+        redirect: 'follow' 
+      });
+      
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.warn("Response is not JSON:", responseText);
+        // Jika response HTML (biasanya halaman login Google atau error script), hentikan
+        return;
       }
+      
+      console.log("Dashboard Data Received:", data);
+
+      let finalData: SubmittedStudentData[] = [];
+
+      // Handle jika data dibungkus object { data: [...] } atau array langsung [...]
+      if (Array.isArray(data)) {
+        finalData = data;
+      } else if (data && Array.isArray(data.data)) {
+        finalData = data.data;
+      } else if (data && data.result === 'error') {
+         console.error("Script Error:", data.message);
+         return;
+      }
+
+      if (finalData.length > 0) {
+        setSubmissions(finalData);
+        localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(finalData));
+      } else {
+        console.log("Data array is empty.");
+      }
+      
     } catch (error) {
       console.error("Error fetching data:", error);
-      alert("Gagal mengambil data terbaru. Menampilkan data tersimpan (jika ada).");
+      alert("Gagal mengambil data terbaru. Cek koneksi atau coba lagi nanti.");
     } finally {
       setIsLoadingDashboard(false);
     }
@@ -487,13 +518,13 @@ function App() {
                   currentItems.map((data, index) => (
                     <tr key={data.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-gray-500">{indexOfFirstItem + index + 1}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.tanggalPendaftaran}</td>
-                      <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{data.namaLengkap}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.jenisKelamin}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.namaAyah}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.namaIbu}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-green-600 font-medium">{data.noWhatsapp}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.email}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.tanggalPendaftaran || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{data.namaLengkap || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.jenisKelamin || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.namaAyah || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.namaIbu || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-green-600 font-medium">{data.noWhatsapp || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.email || '-'}</td>
                       
                       {/* Link Drive Columns */}
                       <td className="px-6 py-4 whitespace-nowrap text-center">
