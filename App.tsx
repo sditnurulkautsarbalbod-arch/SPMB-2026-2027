@@ -17,7 +17,7 @@ import {
 
 // --- CONFIGURATION ---
 // PASTE YOUR GOOGLE WEB APP URL HERE
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz44rE7G6ysA5mU4SQs6CgWp4U2QD8wf1XxB5bkhVp0NsLTSlnGLe-e9xuHgGynOYtK/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAGBga2GnD2FgJtjAxdDACaJ0gHG4o9io418RSYMckxoajiX6TP2mmvZY_UA9veYmB/exec"; 
 
 const STORAGE_KEY = 'spmb_form_data';
 const DASHBOARD_CACHE_KEY = 'spmb_dashboard_cache'; // Key untuk cache dashboard
@@ -153,9 +153,19 @@ function App() {
       }
 
       if (finalData.length > 0) {
-        setSubmissions(finalData);
-        localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(finalData));
+        // FILTERISASI PENTING:
+        // Filter data yang memiliki ID dan Nama Lengkap untuk membuang baris kosong (Ghost Rows)
+        // Ini mengatasi bug di mana Google Sheet membaca 1000 baris kosong sebagai data
+        const validData = finalData.filter(item => 
+          item.id && 
+          item.namaLengkap && 
+          String(item.namaLengkap).trim() !== ""
+        );
+
+        setSubmissions(validData);
+        localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(validData));
       } else {
+        setSubmissions([]); // Pastikan kosong jika array empty
         console.log("Data array is empty.");
       }
       
