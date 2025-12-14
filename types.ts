@@ -114,6 +114,6 @@ export const OPTIONS = {
   tempatTinggal: ['Bersama Ortu', 'Wali', 'Asrama', 'Panti Asuhan', 'Pesantren'],
   modaTransportasi: ['Jalan Kaki', 'Angkutan Umum', 'Ojek', 'Sepeda', 'Sepeda Motor', 'Mobil Pribadi'],
   pendidikan: ['SD/Sederajat', 'SMP/Sederajat', 'SMA/Sederajat', 'D1', 'D2', 'D3', 'S1', 'S2', 'S3', 'Tidak Sekolah'],
-  penghasilan: ['Kurang dari 500.000', '500.000 - 999.999', '1.000.000 - 1.999.999', '2.000.000 - 4.999.999', '5.000.000 - 20.000.000', 'Lebih dari 20.000.000'],
+  penghasilan: ['Tidak Berpenghasilan', 'Kurang dari 500.000', '500.000 - 999.999', '1.000.000 - 1.999.999', '2.000.000 - 4.999.999', '5.000.000 - 20.000.000', 'Lebih dari 20.000.000'],
   pilihanYaTidak: ['Ya', 'Tidak']
 };
