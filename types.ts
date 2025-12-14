@@ -51,9 +51,16 @@ export interface StudentFormData {
   // Kontak
   noWhatsapp: string;
   email: string;
+}
 
-  // Files (Stored as dummy string references for cache logic, actual files managed via Input)
-  // Note: We don't cache File objects in localStorage due to size limits.
+export interface SubmittedStudentData extends StudentFormData {
+  id: number;
+  tanggalPendaftaran: string;
+  // Mock links for the dashboard
+  linkFoto: string;
+  linkKK: string;
+  linkAkta: string;
+  linkTransfer: string;
 }
 
 export const INITIAL_STATE: StudentFormData = {

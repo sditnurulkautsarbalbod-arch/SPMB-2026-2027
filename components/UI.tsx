@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertCircle, CheckCircle, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertCircle, CheckCircle, Info, Upload } from 'lucide-react';
 
 // --- Types ---
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -82,29 +82,77 @@ export const SelectField: React.FC<SelectProps> = ({ label, options, error, requ
   </div>
 );
 
-export const FileInputField: React.FC<FileInputProps> = ({ label, error, required, helperText, ...props }) => (
-  <div className="flex flex-col gap-1 md:col-span-2">
-    <label className="text-sm font-semibold text-gray-700">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
-    <div className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors ${error ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-primary bg-gray-50'}`}>
-      <div className="space-y-1 text-center">
-        <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-          <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <div className="flex text-sm text-gray-600 justify-center">
-          <label className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
-            <span>Upload file</span>
-            <input type="file" className="sr-only" {...props} />
-          </label>
+export const FileInputField: React.FC<FileInputProps> = ({ label, error, required, helperText, onChange, ...props }) => {
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Jalankan onChange dari parent (App.tsx) terlebih dahulu untuk validasi
+    if (onChange) onChange(e);
+
+    // Cek apakah file masih ada (mungkin dihapus parent jika size > 10MB)
+    const file = e.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+    } else {
+      setFileName(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 md:col-span-2">
+      <label className="text-sm font-semibold text-gray-700">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      
+      <div className={`flex items-center justify-between p-3 border rounded-xl transition-all duration-200 ${
+        error 
+          ? 'border-red-300 bg-red-50' 
+          : fileName 
+            ? 'border-green-500 bg-green-50 ring-1 ring-green-500' 
+            : 'border-gray-300 bg-white hover:border-primary hover:shadow-sm'
+      }`}>
+        <div className="flex items-center gap-3 overflow-hidden pr-2">
+          <div className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
+            fileName ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+          }`}>
+            {fileName ? <CheckCircle className="w-5 h-5" /> : <Upload className="w-5 h-5" />}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className={`text-sm font-medium truncate ${fileName ? 'text-gray-900' : 'text-gray-500'}`}>
+              {fileName || 'Belum ada file dipilih'}
+            </span>
+            {fileName && (
+              <span className="text-xs text-green-600 font-bold flex items-center gap-1 animate-pulse">
+                Berhasil Upload
+              </span>
+            )}
+          </div>
         </div>
-        <p className="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
-        {helperText && <p className="text-xs text-blue-500 font-medium">{helperText}</p>}
+
+        <label className="flex-shrink-0">
+          <span className={`cursor-pointer inline-flex items-center px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+            fileName
+              ? 'text-gray-500 hover:text-gray-700 bg-transparent'
+              : 'bg-primary text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 hover:shadow-blue-500/40'
+          }`}>
+            {fileName ? 'Ganti' : 'Pilih File'}
+          </span>
+          <input 
+            type="file" 
+            className="sr-only" 
+            onChange={handleFileChange} 
+            {...props} 
+          />
+        </label>
+      </div>
+      
+      <div className="flex justify-between items-start px-1">
+        <span className="text-xs text-gray-400">{helperText}</span>
+        {error && <span className="text-xs font-semibold text-red-500">{error}</span>}
       </div>
     </div>
-    {error && <span className="text-xs text-red-500 mt-1">{error}</span>}
-  </div>
-);
+  );
+};
 
 export const InfoHeader: React.FC = () => (
   <div className="bg-yellow-50 border-l-4 border-accent p-4 md:p-6 mb-8 rounded-r-lg shadow-sm">
@@ -144,7 +192,7 @@ export const ConfirmDialog: React.FC<{ isOpen: boolean; onConfirm: () => void; o
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-all">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-fade-in-up">
         <div className="flex items-center justify-center w-12 h-12 mx-auto bg-blue-100 rounded-full mb-4">
           <Info className="w-6 h-6 text-primary" />
@@ -187,15 +235,43 @@ export const ConfirmDialog: React.FC<{ isOpen: boolean; onConfirm: () => void; o
 export const SuccessNotification: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed top-4 right-4 z-50 animate-fade-in-left">
-      <div className="bg-green-500 text-white px-6 py-4 rounded-lg shadow-xl flex items-center gap-3">
-        <CheckCircle className="w-6 h-6" />
-        <div>
-          <h4 className="font-bold">Berhasil!</h4>
-          <p className="text-sm">Data pendaftaran telah terkirim.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-all">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-fade-in-scale text-center relative overflow-hidden">
+        {/* Decorative Background Element */}
+        <div className="absolute top-0 left-0 w-full h-2 bg-green-500"></div>
+        
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle className="w-10 h-10 text-green-600" />
         </div>
-        <button onClick={onClose} className="ml-4 text-white/80 hover:text-white">
-          ✕
+        
+        <h4 className="text-2xl font-bold text-gray-900 mb-3">Berhasil Terkirim!</h4>
+        <p className="text-gray-500 mb-6 leading-relaxed">
+          Terima kasih. Data pendaftaran formulir Anda telah berhasil kami terima dan simpan.
+        </p>
+        
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6 text-left text-sm">
+            <p className="font-bold text-blue-800 mb-2">Langkah Selanjutnya:</p>
+            <ol className="list-decimal pl-4 space-y-2 text-gray-700">
+                <li>Silakan cek secara berkala dan <strong>cetak / print out</strong> bukti pendaftaran yang terkirim di email Anda.</li>
+                <li>
+                    Silakan gabung di grup WhatsApp SPMB Nurul Kautsar:<br/>
+                    <a 
+                        href="https://bit.ly/Grup-WA-SDITNurulKautsar" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary font-bold hover:underline break-words block mt-1"
+                    >
+                        https://bit.ly/Grup-WA-SDITNurulKautsar
+                    </a>
+                </li>
+            </ol>
+        </div>
+        
+        <button
+          onClick={onClose}
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-green-500/30 transform hover:-translate-y-0.5"
+        >
+          Selesai
         </button>
       </div>
     </div>
