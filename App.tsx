@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, MapPin, Users, Smartphone, Send, Save, 
   Settings, Lock, LogOut, ExternalLink, ArrowLeft, RefreshCw,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, UserCheck
 } from 'lucide-react';
 import { INITIAL_STATE, OPTIONS, StudentFormData, SubmittedStudentData } from './types';
 import { 
@@ -21,6 +21,7 @@ const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAGBga2GnD2F
 
 const STORAGE_KEY = 'spmb_form_data';
 const DASHBOARD_CACHE_KEY = 'spmb_dashboard_cache'; // Key untuk cache dashboard
+const ADMIN_SESSION_KEY = 'spmb_admin_session'; // Key untuk sesi login admin
 
 // CHANGE: Mengambil password dari Environment Variable (Vercel)
 // Jika di Vercel tidak diset, defaultnya adalah 'admin'
@@ -62,8 +63,17 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1); // State untuk pagination
 
   // --- Effects ---
+  
+  // 1. Check Login Session on Mount
   useEffect(() => {
-    // Load Form Draft (Only text data)
+    const isLoggedIn = localStorage.getItem(ADMIN_SESSION_KEY) === 'true';
+    if (isLoggedIn) {
+      setCurrentView('dashboard');
+    }
+  }, []);
+
+  // 2. Load Form Draft
+  useEffect(() => {
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (savedData) {
       try {
@@ -76,16 +86,17 @@ function App() {
     isLoaded.current = true;
   }, []);
 
+  // 3. Save Draft on Change
   useEffect(() => {
     if (isLoaded.current && currentView === 'form') {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
     }
   }, [formData, currentView]);
 
-  // Load data when entering dashboard
+  // 4. Load Dashboard Data
   useEffect(() => {
     if (currentView === 'dashboard') {
-      // 1. Coba load dari LocalStorage dulu (Cache)
+      // a. Coba load dari LocalStorage dulu (Cache Data)
       const cachedData = localStorage.getItem(DASHBOARD_CACHE_KEY);
       if (cachedData) {
         try {
@@ -98,7 +109,7 @@ function App() {
         }
       }
       
-      // 2. Fetch data terbaru dari server
+      // b. Fetch data terbaru dari server
       fetchSubmissions();
     }
   }, [currentView]);
@@ -367,6 +378,7 @@ function App() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordInput === ADMIN_PASSWORD) {
+      localStorage.setItem(ADMIN_SESSION_KEY, 'true'); // Simpan sesi
       setCurrentView('dashboard');
       setLoginError('');
       setPasswordInput('');
@@ -376,9 +388,8 @@ function App() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem(ADMIN_SESSION_KEY); // Hapus sesi
     setCurrentView('form');
-    // Opsional: setSubmissions([]) jika ingin clear data saat logout, 
-    // tapi karena ada cache localStorage, data akan muncul lagi saat login.
   };
 
   // --- Renders ---
@@ -453,6 +464,10 @@ function App() {
   );
 
   const renderDashboard = () => {
+    // Logic Stats
+    const totalLaki = submissions.filter(s => s.jenisKelamin === 'Laki-laki').length;
+    const totalPerempuan = submissions.filter(s => s.jenisKelamin === 'Perempuan').length;
+
     // Logic Pagination
     const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
     const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
@@ -469,25 +484,59 @@ function App() {
 
     return (
       <div className="max-w-[95%] mx-auto py-8 animate-fade-in-up">
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+        {/* Header Dashboard & Stats */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-1">Dashboard Admin</h2>
+            <p className="text-gray-500 text-sm">Ringkasan data pendaftaran siswa baru</p>
           </div>
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={fetchSubmissions}
-              disabled={isLoadingDashboard}
-              className="flex items-center gap-2 text-primary hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </button>
-            <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
-              <span className="font-bold text-primary text-xl">{submissions.length}</span> <span className="text-gray-500 text-sm">Pendaftar</span>
-            </div>
-          </div>
+          <button 
+            onClick={fetchSubmissions}
+            disabled={isLoadingDashboard}
+            className="flex items-center gap-2 text-white bg-primary hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </button>
         </div>
 
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+           {/* Card Total */}
+           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Pendaftar</p>
+                <p className="text-3xl font-bold text-gray-800 mt-1">{submissions.length}</p>
+              </div>
+              <div className="p-3 bg-indigo-50 rounded-full">
+                <Users className="w-6 h-6 text-indigo-600" />
+              </div>
+           </div>
+           
+           {/* Card Laki-laki */}
+           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Laki-laki</p>
+                <p className="text-3xl font-bold text-blue-600 mt-1">{totalLaki}</p>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-full">
+                <UserCheck className="w-6 h-6 text-blue-600" />
+              </div>
+           </div>
+
+           {/* Card Perempuan */}
+           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Perempuan</p>
+                <p className="text-3xl font-bold text-pink-600 mt-1">{totalPerempuan}</p>
+              </div>
+              <div className="p-3 bg-pink-50 rounded-full">
+                <UserCheck className="w-6 h-6 text-pink-600" />
+              </div>
+           </div>
+        </div>
+
+        {/* Table Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -530,7 +579,17 @@ function App() {
                       <td className="px-6 py-4 whitespace-nowrap text-gray-500">{indexOfFirstItem + index + 1}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.tanggalPendaftaran || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{data.namaLengkap || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.jenisKelamin || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          data.jenisKelamin === 'Laki-laki' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : data.jenisKelamin === 'Perempuan' 
+                            ? 'bg-pink-100 text-pink-700' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {data.jenisKelamin || '-'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.namaAyah || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.namaIbu || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-green-600 font-medium">{data.noWhatsapp || '-'}</td>
