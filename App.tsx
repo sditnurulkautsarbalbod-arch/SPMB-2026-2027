@@ -947,7 +947,7 @@ function App() {
               required 
               onChange={handleFileChange} 
               accept="image/*"
-              helperText="File Gambar (JPG/PNG), latar belakang merah/biru. Max 10MB"
+              helperText="File Gambar (PDF/JPG/PNG), latar belakang merah/biru. Max 10MB"
               error={errors.fileFoto}
             />
             <FileInputField 
@@ -956,7 +956,7 @@ function App() {
               required 
               onChange={handleFileChange}
               accept="image/*"
-              helperText="File Gambar (JPG/PNG). Max 10MB"
+              helperText="File Gambar (PDF/JPG/PNG). Max 10MB"
               error={errors.fileKK}
             />
             <FileInputField 
@@ -965,7 +965,7 @@ function App() {
               required 
               onChange={handleFileChange}
               accept="image/*"
-              helperText="File Gambar (JPG/PNG). Max 10MB"
+              helperText="File Gambar (PDF/JPG/PNG). Max 10MB"
               error={errors.fileAkta}
             />
             <FileInputField 
@@ -974,7 +974,7 @@ function App() {
               required 
               onChange={handleFileChange} 
               accept="image/*"
-              helperText="File Gambar (JPG/PNG). Pastikan nominal Rp 150.000,-. Max 10MB"
+              helperText="File Gambar (PDF/JPG/PNG). Pastikan nominal Rp 150.000,-. Max 10MB"
               error={errors.fileTransfer}
             />
           </FormSection>
