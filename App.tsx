@@ -734,8 +734,8 @@ function App() {
               error={errors.nisn}
               helperText={
                 <span className="block space-y-1">
-                  <span className="block">NISN bisa dilihat di halaman identitas rapor siswa atau ijazah</span>
-                  <span className="block">Tulis " - " apabila belum memiliki NISN atau tidak sekolah TK/RA</span>
+                  <span className="block">NISN dapat dilihat pada halaman identitas rapor siswa atau ijazah.</span>
+                  <span className="block">Tulis tanda “–” apabila belum memiliki NISN atau tidak bersekolah di TK/RA.</span>
                 </span>
               }
             />
