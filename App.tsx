@@ -932,9 +932,9 @@ function App() {
               error={errors.email}
               helperText={
                 <span className="block mt-1 space-y-1">
-                  <span className="block">Pastikan Email yang digunakan aktif dan dapat dibuka, bukti pendaftaran ini akan dikirim ke Email anda !!!</span>
-                  <span className="block">Contoh: Namasaya@gmail.com</span>
-                  <span className="block italic text-red-500">*Cukup input 1 email saja, bukti pendaftaran ini tidak akan terkirim apabila menginput lebih dari 1 email.</span>
+                  <span className="block">Pastikan email yang digunakan aktif dan dapat diakses. Bukti pendaftaran akan dikirim ke email Anda.</span>
+                  <span className="block">Contoh: namasaya@gmail.com</span>
+                  <span className="block italic text-red-500">*Cukup masukkan satu alamat email. Bukti pendaftaran tidak akan terkirim apabila Anda memasukkan lebih dari satu alamat email.</span>
                 </span>
               }
             />
