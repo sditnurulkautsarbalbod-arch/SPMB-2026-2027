@@ -161,24 +161,23 @@ export const InfoHeader: React.FC = () => (
         <AlertCircle className="h-6 w-6 text-accent" />
       </div>
       <div className="ml-3">
-        <h3 className="text-lg font-bold text-yellow-800">WAJIB DIBACA !!!</h3>
+        <h3 className="text-lg font-bold text-yellow-800">WAJIB DIBACA!</h3>
         <div className="mt-2 text-sm text-yellow-700 space-y-3">
           <p>
-            Orang tua/wali bertanggung jawab secara hukum terhadap kebenaran data yang tercantum.
-            Mohon diisi dengan benar dan lengkap karena data ini nantinya akan diinput di <strong>DAPODIK (DATA POKOK PENDIDIKAN)</strong>.
+            Orang tua/wali bertanggung jawab secara hukum atas kebenaran data yang tercantum. Mohon diisi dengan benar dan lengkap karena data ini nantinya akan diinput ke <strong>DAPODIK (DATA POKOK PENDIDIKAN)</strong>.
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Pastikan usia ananda telah mencapai minimal <strong>5 (Lima) Tahun 6 (Enam) Bulan</strong> per tanggal 01 Juli 2026.</li>
-            <li>Untuk ananda yang berusia di bawah 6 (Enam) Tahun per tanggal 01 Juli 2026 wajib menyertakan <strong>Surat Keterangan Psikologi</strong>.</li>
+            <li>Pastikan usia ananda telah mencapai minimal <strong>5 (lima) tahun 6 (enam) bulan</strong> per tanggal 1 Juli 2026.</li>
+            <li>Ananda yang berusia di bawah 6 (enam) tahun per tanggal 1 Juli 2026 wajib menyertakan <strong>Surat Keterangan Psikologi</strong> dan membawanya pada saat tes.</li>
           </ul>
           <div className="bg-white/50 p-3 rounded-md border border-yellow-200">
             <p className="font-semibold text-red-600">
-              Pastikan Anda telah membayar biaya pendaftaran Rp 150.000,-.
+              Pastikan Anda telah membayar biaya pendaftaran sebesar Rp150.000,-.
             </p>
-            <p className="text-xs mt-1">Pendaftaran tidak akan diproses apabila belum membayar biaya pendaftaran.</p>
+            <p className="text-xs mt-1">Pendaftaran tidak akan diproses apabila biaya pendaftaran belum dibayarkan.</p>
             <div className="mt-2 font-mono text-sm bg-white p-2 rounded inline-block">
               <p>Bank BSI</p>
-              <p>A/N : Alwi Firsadi</p>
+              <p>A/N     : Alwi Firsadi</p>
               <p>No. Rek : 1996070691</p>
             </div>
           </div>
@@ -254,7 +253,7 @@ export const SuccessNotification: React.FC<{ isOpen: boolean; onClose: () => voi
             <ol className="list-decimal pl-4 space-y-2 text-gray-700">
                 <li>Silakan cek secara berkala dan <strong>cetak / print out</strong> bukti pendaftaran yang terkirim di email Anda.</li>
                 <li>
-                    Silakan gabung di grup WhatsApp SPMB Nurul Kautsar:<br/>
+                    Silakan gabung di grup Whatsapp SPMB Nurul Kautsar:<br/>
                     <a 
                         href="https://bit.ly/Grup-WA-SDITNurulKautsar" 
                         target="_blank" 
