@@ -368,7 +368,7 @@ function App() {
 
     } catch (error: any) {
       console.error("Submission error:", error);
-      alert(`Gagal mengirim data: ${error.message || "Silakan coba lagi atau hubungi admin."}`);
+      alert(`Gagal mengirim data: ${error.message || "Silakan coba lagi."}`);
       setIsSubmitting(false);
       setShowConfirm(false);
     }
