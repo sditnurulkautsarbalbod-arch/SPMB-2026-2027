@@ -746,7 +746,7 @@ function App() {
               onChange={handleChange} 
               required
               error={errors.asalSekolah}
-              helperText='Tulis " - " apabila tidak sekolah TK/RA'
+              helperText='Tulis tanda “–” apabila tidak bersekolah di TK/RA'
             />
             <InputField 
               label="Alamat Asal Sekolah" 
@@ -755,7 +755,7 @@ function App() {
               onChange={handleChange} 
               required
               error={errors.alamatAsalSekolah}
-              helperText='Tulis " - " apabila tidak sekolah TK/RA'
+              helperText='Tulis tanda “–” apabila tidak bersekolah di TK/RA'
             />
             <InputField 
               label="Anak Keberapa" 
