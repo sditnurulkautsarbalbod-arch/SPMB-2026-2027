@@ -577,7 +577,7 @@ function App() {
                   currentItems.map((data, index) => (
                     <tr key={data.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-gray-500">{indexOfFirstItem + index + 1}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.tanggalPendaftaran || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.tanggalPendaftaran ? data.tanggalPendaftaran.split('T')[0] : '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{data.namaLengkap || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
