@@ -4,7 +4,7 @@ import {
   Settings, Lock, LogOut, ExternalLink, ArrowLeft, RefreshCw,
   ChevronLeft, ChevronRight, UserCheck
 } from 'lucide-react';
-import { INITIAL_STATE, OPTIONS, StudentFormData, SubmittedStudentData } from './types';
+import { INITIAL_STATE, OPTIONS, StudentFormData, SubmittedStudentData, getGelombang } from './types';
 import { 
   FormSection, 
   InputField, 
@@ -467,6 +467,8 @@ function App() {
     // Logic Stats
     const totalLaki = submissions.filter(s => s.jenisKelamin === 'Laki-laki').length;
     const totalPerempuan = submissions.filter(s => s.jenisKelamin === 'Perempuan').length;
+    const totalGelombang1 = submissions.filter(s => getGelombang(s.tanggalPendaftaran) === 'Gelombang 1').length;
+    const totalGelombang2 = submissions.filter(s => getGelombang(s.tanggalPendaftaran) === 'Gelombang 2').length;
 
     // Logic Pagination
     const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
@@ -501,7 +503,7 @@ function App() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
            {/* Card Total */}
            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
               <div>
@@ -512,7 +514,29 @@ function App() {
                 <Users className="w-6 h-6 text-indigo-600" />
               </div>
            </div>
-           
+
+           {/* Card Gelombang 1 */}
+           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Gelombang 1</p>
+                <p className="text-3xl font-bold text-emerald-600 mt-1">{totalGelombang1}</p>
+              </div>
+              <div className="p-3 bg-emerald-50 rounded-full">
+                <UserCheck className="w-6 h-6 text-emerald-600" />
+              </div>
+           </div>
+
+           {/* Card Gelombang 2 */}
+           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Gelombang 2</p>
+                <p className="text-3xl font-bold text-orange-600 mt-1">{totalGelombang2}</p>
+              </div>
+              <div className="p-3 bg-orange-50 rounded-full">
+                <UserCheck className="w-6 h-6 text-orange-600" />
+              </div>
+           </div>
+
            {/* Card Laki-laki */}
            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
               <div>
@@ -543,6 +567,7 @@ function App() {
               <thead className="bg-gray-50 text-gray-700 border-b border-gray-200 font-semibold uppercase text-xs tracking-wider">
                 <tr>
                   <th className="px-6 py-4 whitespace-nowrap">No</th>
+                  <th className="px-6 py-4 whitespace-nowrap">Gelombang</th>
                   <th className="px-6 py-4 whitespace-nowrap">Tanggal Pendaftar</th>
                   <th className="px-6 py-4 whitespace-nowrap">Nama Lengkap</th>
                   <th className="px-6 py-4 whitespace-nowrap">Jenis Kelamin</th>
@@ -560,7 +585,7 @@ function App() {
                 {submissions.length === 0 ? (
                   isLoadingDashboard ? (
                     <tr>
-                      <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={13} className="px-6 py-12 text-center text-gray-500">
                         <div className="flex justify-center items-center gap-2">
                           <RefreshCw className="w-5 h-5 animate-spin text-primary" /> Mengambil data...
                         </div>
@@ -568,7 +593,7 @@ function App() {
                     </tr>
                   ) : (
                     <tr>
-                      <td colSpan={12} className="px-6 py-12 text-center text-gray-400">
+                      <td colSpan={13} className="px-6 py-12 text-center text-gray-400">
                         Belum ada data pendaftaran yang masuk.
                       </td>
                     </tr>
@@ -577,6 +602,17 @@ function App() {
                   currentItems.map((data, index) => (
                     <tr key={data.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-gray-500">{indexOfFirstItem + index + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          getGelombang(data.tanggalPendaftaran) === 'Gelombang 1'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : getGelombang(data.tanggalPendaftaran) === 'Gelombang 2'
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {getGelombang(data.tanggalPendaftaran)}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-600">{data.tanggalPendaftaran ? data.tanggalPendaftaran.split('T')[0] : '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{data.namaLengkap || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
