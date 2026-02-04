@@ -1,27 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  User, MapPin, Users, Smartphone, Send, Save, 
+import {
+  User, MapPin, Users, Smartphone, Send, Save,
   Settings, Lock, LogOut, ExternalLink, ArrowLeft, RefreshCw,
-  ChevronLeft, ChevronRight, UserCheck
+  ChevronLeft, ChevronRight, UserCheck, AlertTriangle
 } from 'lucide-react';
 import { INITIAL_STATE, OPTIONS, StudentFormData, SubmittedStudentData, getGelombang } from './types';
-import { 
-  FormSection, 
-  InputField, 
-  SelectField, 
-  FileInputField, 
-  InfoHeader, 
-  ConfirmDialog, 
-  SuccessNotification 
+import {
+  FormSection,
+  InputField,
+  SelectField,
+  FileInputField,
+  InfoHeader,
+  ConfirmDialog,
+  SuccessNotification,
+  QuotaStatusCard
 } from './components/UI';
 
 // --- CONFIGURATION ---
 // PASTE YOUR GOOGLE WEB APP URL HERE
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAGBga2GnD2FgJtjAxdDACaJ0gHG4o9io418RSYMckxoajiX6TP2mmvZY_UA9veYmB/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAGBga2GnD2FgJtjAxdDACaJ0gHG4o9io418RSYMckxoajiX6TP2mmvZY_UA9veYmB/exec";
 
 const STORAGE_KEY = 'spmb_form_data';
 const DASHBOARD_CACHE_KEY = 'spmb_dashboard_cache'; // Key untuk cache dashboard
 const ADMIN_SESSION_KEY = 'spmb_admin_session'; // Key untuk sesi login admin
+
+// --- QUOTA CONSTANTS ---
+const KUOTA_LAKI = 44;
+const KUOTA_PEREMPUAN = 46;
+const KUOTA_TOTAL = KUOTA_LAKI + KUOTA_PEREMPUAN; // 90
 
 // CHANGE: Mengambil password dari Environment Variable (Vercel)
 // Jika di Vercel tidak diset, defaultnya adalah 'admin'
@@ -61,9 +67,30 @@ function App() {
   const [submissions, setSubmissions] = useState<SubmittedStudentData[]>([]);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
   const [currentPage, setCurrentPage] = useState(1); // State untuk pagination
+  const [isLoadingQuota, setIsLoadingQuota] = useState(true); // State untuk loading kuota
+
+  // --- Quota Calculation ---
+  const kuotaTerisiLaki = submissions.filter(s => s.jenisKelamin === 'Laki-laki').length;
+  const kuotaTerisiPerempuan = submissions.filter(s => s.jenisKelamin === 'Perempuan').length;
+  const kuotaTerisiTotal = kuotaTerisiLaki + kuotaTerisiPerempuan;
+
+  const sisaKuotaLaki = KUOTA_LAKI - kuotaTerisiLaki;
+  const sisaKuotaPerempuan = KUOTA_PEREMPUAN - kuotaTerisiPerempuan;
+  const sisaKuotaTotal = KUOTA_TOTAL - kuotaTerisiTotal;
+
+  const isKuotaLakiPenuh = sisaKuotaLaki <= 0;
+  const isKuotaPerempuanPenuh = sisaKuotaPerempuan <= 0;
+  const isKuotaTotalPenuh = sisaKuotaTotal <= 0;
+
+  // Blocking logic based on selected gender
+  const selectedGender = formData.jenisKelamin;
+  const isGenderBlocked =
+    (selectedGender === 'Laki-laki' && isKuotaLakiPenuh) ||
+    (selectedGender === 'Perempuan' && isKuotaPerempuanPenuh);
+  const isFormDisabled = isKuotaTotalPenuh || isGenderBlocked;
 
   // --- Effects ---
-  
+
   // 1. Check Login Session on Mount
   useEffect(() => {
     const isLoggedIn = localStorage.getItem(ADMIN_SESSION_KEY) === 'true';
@@ -93,23 +120,27 @@ function App() {
     }
   }, [formData, currentView]);
 
-  // 4. Load Dashboard Data
+  // 4. Fetch Submissions on App Load (for quota calculation)
+  useEffect(() => {
+    // Load from cache first for immediate quota display
+    const cachedData = localStorage.getItem(DASHBOARD_CACHE_KEY);
+    if (cachedData) {
+      try {
+        const parsedCache = JSON.parse(cachedData);
+        if (Array.isArray(parsedCache)) {
+          setSubmissions(parsedCache);
+        }
+      } catch (e) {
+        console.error("Gagal load cache dashboard", e);
+      }
+    }
+    // Then fetch fresh data from server
+    fetchSubmissionsForQuota();
+  }, []);
+
+  // 5. Load Dashboard Data when entering dashboard
   useEffect(() => {
     if (currentView === 'dashboard') {
-      // a. Coba load dari LocalStorage dulu (Cache Data)
-      const cachedData = localStorage.getItem(DASHBOARD_CACHE_KEY);
-      if (cachedData) {
-        try {
-          const parsedCache = JSON.parse(cachedData);
-          if (Array.isArray(parsedCache)) {
-            setSubmissions(parsedCache);
-          }
-        } catch (e) {
-          console.error("Gagal load cache dashboard", e);
-        }
-      }
-      
-      // b. Fetch data terbaru dari server
       fetchSubmissions();
     }
   }, [currentView]);
@@ -122,6 +153,59 @@ function App() {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = error => reject(error);
     });
+  };
+
+  // Fetch submissions for quota calculation (silent, no loading indicator on dashboard)
+  const fetchSubmissionsForQuota = async () => {
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("PASTE_")) {
+      setIsLoadingQuota(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'GET',
+        redirect: 'follow'
+      });
+
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.warn("Response is not JSON:", responseText);
+        setIsLoadingQuota(false);
+        return;
+      }
+
+      let finalData: SubmittedStudentData[] = [];
+
+      if (Array.isArray(data)) {
+        finalData = data;
+      } else if (data && Array.isArray(data.data)) {
+        finalData = data.data;
+      } else if (data && data.result === 'error') {
+        console.error("Script Error:", data.message);
+        setIsLoadingQuota(false);
+        return;
+      }
+
+      if (finalData.length > 0) {
+        const validData = finalData.filter(item =>
+          item.id &&
+          item.namaLengkap &&
+          String(item.namaLengkap).trim() !== ""
+        );
+        setSubmissions(validData);
+        localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(validData));
+      } else {
+        setSubmissions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching quota data:", error);
+    } finally {
+      setIsLoadingQuota(false);
+    }
   };
 
   const fetchSubmissions = async () => {
@@ -470,6 +554,11 @@ function App() {
     const totalGelombang1 = submissions.filter(s => getGelombang(s.tanggalPendaftaran) === 'Gelombang 1').length;
     const totalGelombang2 = submissions.filter(s => getGelombang(s.tanggalPendaftaran) === 'Gelombang 2').length;
 
+    // Quota info for dashboard
+    const sisaLaki = KUOTA_LAKI - totalLaki;
+    const sisaPerempuan = KUOTA_PEREMPUAN - totalPerempuan;
+    const sisaTotal = KUOTA_TOTAL - submissions.length;
+
     // Logic Pagination
     const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
     const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
@@ -492,7 +581,7 @@ function App() {
             <h2 className="text-2xl font-bold text-gray-800 mb-1">Dashboard Admin</h2>
             <p className="text-gray-500 text-sm">Ringkasan data pendaftaran siswa baru</p>
           </div>
-          <button 
+          <button
             onClick={fetchSubmissions}
             disabled={isLoadingDashboard}
             className="flex items-center gap-2 text-white bg-primary hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
@@ -500,6 +589,64 @@ function App() {
             <RefreshCw className={`w-4 h-4 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
             Refresh Data
           </button>
+        </div>
+
+        {/* Quota Progress Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
+            Status Kuota Pendaftaran
+            <span className={`ml-2 text-sm px-2 py-0.5 rounded-full ${sisaTotal <= 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+              {sisaTotal > 0 ? `Sisa ${sisaTotal} kursi` : 'PENUH'}
+            </span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Total Kuota */}
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-medium text-gray-600">Total Kuota</span>
+                <span className={`font-bold ${sisaTotal <= 0 ? 'text-red-600' : 'text-gray-800'}`}>
+                  {submissions.length} / {KUOTA_TOTAL}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                <div
+                  className={`h-4 rounded-full transition-all duration-500 ${sisaTotal <= 0 ? 'bg-red-500' : 'bg-indigo-500'}`}
+                  style={{ width: `${Math.min((submissions.length / KUOTA_TOTAL) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+            {/* Kuota Laki-laki */}
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-medium text-gray-600">Laki-laki</span>
+                <span className={`font-bold ${sisaLaki <= 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                  {totalLaki} / {KUOTA_LAKI} {sisaLaki > 0 ? `(Sisa ${sisaLaki})` : '(Penuh)'}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                <div
+                  className={`h-4 rounded-full transition-all duration-500 ${sisaLaki <= 0 ? 'bg-red-500' : 'bg-blue-500'}`}
+                  style={{ width: `${Math.min((totalLaki / KUOTA_LAKI) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+            {/* Kuota Perempuan */}
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-medium text-gray-600">Perempuan</span>
+                <span className={`font-bold ${sisaPerempuan <= 0 ? 'text-red-600' : 'text-pink-600'}`}>
+                  {totalPerempuan} / {KUOTA_PEREMPUAN} {sisaPerempuan > 0 ? `(Sisa ${sisaPerempuan})` : '(Penuh)'}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                <div
+                  className={`h-4 rounded-full transition-all duration-500 ${sisaPerempuan <= 0 ? 'bg-red-500' : 'bg-pink-500'}`}
+                  style={{ width: `${Math.min((totalPerempuan / KUOTA_PEREMPUAN) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -538,24 +685,26 @@ function App() {
            </div>
 
            {/* Card Laki-laki */}
-           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+           <div className={`p-6 rounded-xl shadow-sm border flex items-center justify-between ${sisaLaki <= 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
               <div>
                 <p className="text-sm font-medium text-gray-500">Laki-laki</p>
-                <p className="text-3xl font-bold text-blue-600 mt-1">{totalLaki}</p>
+                <p className={`text-3xl font-bold mt-1 ${sisaLaki <= 0 ? 'text-red-600' : 'text-blue-600'}`}>{totalLaki}</p>
+                <p className={`text-xs ${sisaLaki <= 0 ? 'text-red-500' : 'text-gray-400'}`}>Kuota: {KUOTA_LAKI}</p>
               </div>
-              <div className="p-3 bg-blue-50 rounded-full">
-                <UserCheck className="w-6 h-6 text-blue-600" />
+              <div className={`p-3 rounded-full ${sisaLaki <= 0 ? 'bg-red-100' : 'bg-blue-50'}`}>
+                <UserCheck className={`w-6 h-6 ${sisaLaki <= 0 ? 'text-red-600' : 'text-blue-600'}`} />
               </div>
            </div>
 
            {/* Card Perempuan */}
-           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+           <div className={`p-6 rounded-xl shadow-sm border flex items-center justify-between ${sisaPerempuan <= 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
               <div>
                 <p className="text-sm font-medium text-gray-500">Perempuan</p>
-                <p className="text-3xl font-bold text-pink-600 mt-1">{totalPerempuan}</p>
+                <p className={`text-3xl font-bold mt-1 ${sisaPerempuan <= 0 ? 'text-red-600' : 'text-pink-600'}`}>{totalPerempuan}</p>
+                <p className={`text-xs ${sisaPerempuan <= 0 ? 'text-red-500' : 'text-gray-400'}`}>Kuota: {KUOTA_PEREMPUAN}</p>
               </div>
-              <div className="p-3 bg-pink-50 rounded-full">
-                <UserCheck className="w-6 h-6 text-pink-600" />
+              <div className={`p-3 rounded-full ${sisaPerempuan <= 0 ? 'bg-red-100' : 'bg-pink-50'}`}>
+                <UserCheck className={`w-6 h-6 ${sisaPerempuan <= 0 ? 'text-red-600' : 'text-pink-600'}`} />
               </div>
            </div>
         </div>
@@ -703,180 +852,240 @@ function App() {
 
   const renderForm = () => (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in-up">
+      {/* Quota Status Card */}
+      <QuotaStatusCard
+        kuotaLaki={KUOTA_LAKI}
+        kuotaPerempuan={KUOTA_PEREMPUAN}
+        kuotaTotal={KUOTA_TOTAL}
+        terisiLaki={kuotaTerisiLaki}
+        terisiPerempuan={kuotaTerisiPerempuan}
+        terisiTotal={kuotaTerisiTotal}
+        isLoading={isLoadingQuota}
+        onRefresh={fetchSubmissionsForQuota}
+      />
+
+      {/* Global Block Warning */}
+      {isKuotaTotalPenuh && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 md:p-6 mb-8 rounded-r-lg shadow-sm">
+          <div className="flex items-start">
+            <AlertTriangle className="h-6 w-6 text-red-500 flex-shrink-0" />
+            <div className="ml-3">
+              <h3 className="text-lg font-bold text-red-800">Pendaftaran Ditutup</h3>
+              <p className="text-sm text-red-700 mt-1">
+                Mohon maaf, kuota pendaftaran sudah penuh. Pendaftaran tidak dapat dilakukan lagi.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <InfoHeader />
 
       <form key={formKey} onSubmit={onPreSubmit} noValidate>
         {/* Data Siswa */}
         <FormSection title="Data Calon Siswa" icon={<User className="w-5 h-5" />}>
-            <InputField 
-              label="Nama Lengkap" 
-              name="namaLengkap" 
-              value={formData.namaLengkap} 
-              onChange={handleChange} 
-              placeholder="Sesuai Akta Lahir" 
-              required 
+            <InputField
+              label="Nama Lengkap"
+              name="namaLengkap"
+              value={formData.namaLengkap}
+              onChange={handleChange}
+              placeholder="Sesuai Akta Lahir"
+              required
               error={errors.namaLengkap}
+              disabled={isKuotaTotalPenuh}
             />
-            <SelectField 
-              label="Jenis Kelamin" 
+            <SelectField
+              label="Jenis Kelamin"
               name="jenisKelamin"
               value={formData.jenisKelamin}
               onChange={handleChange}
               options={OPTIONS.jenisKelamin}
               required
               error={errors.jenisKelamin}
+              disabled={isKuotaTotalPenuh}
             />
-            <InputField 
-              label="NIK" 
-              name="nik" 
+
+            {/* Gender Block Warning */}
+            {isGenderBlocked && !isKuotaTotalPenuh && (
+              <div className="md:col-span-2 bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                  <p className="text-sm font-medium text-red-700">
+                    Kuota untuk jenis kelamin <strong>{selectedGender}</strong> sudah penuh.
+                    Silakan pilih jenis kelamin lain atau hubungi panitia.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <InputField
+              label="NIK"
+              name="nik"
               type="number"
-              value={formData.nik} 
-              onChange={handleChange} 
+              value={formData.nik}
+              onChange={handleChange}
               required
               error={errors.nik}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Nomor KK" 
-              name="noKK" 
+            <InputField
+              label="Nomor KK"
+              name="noKK"
               type="number"
-              value={formData.noKK} 
-              onChange={handleChange} 
+              value={formData.noKK}
+              onChange={handleChange}
               required
               error={errors.noKK}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Tempat Lahir" 
-              name="tempatLahir" 
-              value={formData.tempatLahir} 
-              onChange={handleChange} 
+            <InputField
+              label="Tempat Lahir"
+              name="tempatLahir"
+              value={formData.tempatLahir}
+              onChange={handleChange}
               required
               error={errors.tempatLahir}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Tanggal Lahir" 
-              name="tanggalLahir" 
-              type="date" 
-              value={formData.tanggalLahir} 
-              onChange={handleChange} 
+            <InputField
+              label="Tanggal Lahir"
+              name="tanggalLahir"
+              type="date"
+              value={formData.tanggalLahir}
+              onChange={handleChange}
               required
               error={errors.tanggalLahir}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="NISN" 
-              name="nisn" 
-              value={formData.nisn} 
-              onChange={handleChange} 
+            <InputField
+              label="NISN"
+              name="nisn"
+              value={formData.nisn}
+              onChange={handleChange}
               required
               error={errors.nisn}
+              disabled={isFormDisabled}
               helperText={
                 <span className="block space-y-1">
                   <span className="block">NISN dapat dilihat pada halaman identitas rapor siswa atau ijazah.</span>
-                  <span className="block">Tulis tanda “–” apabila belum memiliki NISN atau tidak bersekolah di TK/RA.</span>
+                  <span className="block">Tulis tanda "–" apabila belum memiliki NISN atau tidak bersekolah di TK/RA.</span>
                 </span>
               }
             />
-            <InputField 
-              label="Asal Sekolah (TK/RA)" 
-              name="asalSekolah" 
-              value={formData.asalSekolah} 
-              onChange={handleChange} 
+            <InputField
+              label="Asal Sekolah (TK/RA)"
+              name="asalSekolah"
+              value={formData.asalSekolah}
+              onChange={handleChange}
               required
               error={errors.asalSekolah}
-              helperText='Tulis tanda “–” apabila tidak bersekolah di TK/RA'
+              disabled={isFormDisabled}
+              helperText='Tulis tanda "–" apabila tidak bersekolah di TK/RA'
             />
-            <InputField 
-              label="Alamat Asal Sekolah" 
-              name="alamatAsalSekolah" 
-              value={formData.alamatAsalSekolah} 
-              onChange={handleChange} 
+            <InputField
+              label="Alamat Asal Sekolah"
+              name="alamatAsalSekolah"
+              value={formData.alamatAsalSekolah}
+              onChange={handleChange}
               required
               error={errors.alamatAsalSekolah}
-              helperText='Tulis tanda “–” apabila tidak bersekolah di TK/RA'
+              disabled={isFormDisabled}
+              helperText='Tulis tanda "–" apabila tidak bersekolah di TK/RA'
             />
-            <InputField 
-              label="Anak Keberapa" 
-              name="anakKeberapa" 
+            <InputField
+              label="Anak Keberapa"
+              name="anakKeberapa"
               type="number"
-              value={formData.anakKeberapa} 
-              onChange={handleChange} 
+              value={formData.anakKeberapa}
+              onChange={handleChange}
               required
               error={errors.anakKeberapa}
+              disabled={isFormDisabled}
             />
-             <InputField 
-              label="Jumlah Saudara" 
-              name="jumlahSaudara" 
+             <InputField
+              label="Jumlah Saudara"
+              name="jumlahSaudara"
               type="number"
-              value={formData.jumlahSaudara} 
-              onChange={handleChange} 
+              value={formData.jumlahSaudara}
+              onChange={handleChange}
               required
               error={errors.jumlahSaudara}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Tinggi Badan (cm)" 
-              name="tinggiBadan" 
+            <InputField
+              label="Tinggi Badan (cm)"
+              name="tinggiBadan"
               type="number"
-              value={formData.tinggiBadan} 
-              onChange={handleChange} 
+              value={formData.tinggiBadan}
+              onChange={handleChange}
               required
               error={errors.tinggiBadan}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Berat Badan (kg)" 
-              name="beratBadan" 
+            <InputField
+              label="Berat Badan (kg)"
+              name="beratBadan"
               type="number"
-              value={formData.beratBadan} 
-              onChange={handleChange} 
+              value={formData.beratBadan}
+              onChange={handleChange}
               required
               error={errors.beratBadan}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Riwayat Penyakit" 
-              name="riwayatPenyakit" 
-              value={formData.riwayatPenyakit} 
-              onChange={handleChange} 
+            <InputField
+              label="Riwayat Penyakit"
+              name="riwayatPenyakit"
+              value={formData.riwayatPenyakit}
+              onChange={handleChange}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Kelainan Jasmani" 
-              name="kelainanJasmani" 
-              value={formData.kelainanJasmani} 
-              onChange={handleChange} 
+            <InputField
+              label="Kelainan Jasmani"
+              name="kelainanJasmani"
+              value={formData.kelainanJasmani}
+              onChange={handleChange}
+              disabled={isFormDisabled}
             />
           </FormSection>
 
           {/* Alamat & Tempat Tinggal */}
           <FormSection title="Alamat & Tempat Tinggal" icon={<MapPin className="w-5 h-5" />}>
-            <InputField 
-              label="Alamat Jalan" 
-              name="alamatJalan" 
+            <InputField
+              label="Alamat Jalan"
+              name="alamatJalan"
               className="md:col-span-2"
-              value={formData.alamatJalan} 
-              onChange={handleChange} 
+              value={formData.alamatJalan}
+              onChange={handleChange}
               placeholder="Nama Jalan, Gg, No. Rumah"
               required
               error={errors.alamatJalan}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Desa / Kelurahan" 
-              name="desaKelurahan" 
-              value={formData.desaKelurahan} 
-              onChange={handleChange} 
+            <InputField
+              label="Desa / Kelurahan"
+              name="desaKelurahan"
+              value={formData.desaKelurahan}
+              onChange={handleChange}
               required
               error={errors.desaKelurahan}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Kecamatan" 
-              name="kecamatan" 
-              value={formData.kecamatan} 
-              onChange={handleChange} 
+            <InputField
+              label="Kecamatan"
+              name="kecamatan"
+              value={formData.kecamatan}
+              onChange={handleChange}
               required
               error={errors.kecamatan}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="RT / RW" 
-              name="rtRw" 
-              value={formData.rtRw} 
-              onChange={handleChange} 
+            <InputField
+              label="RT / RW"
+              name="rtRw"
+              value={formData.rtRw}
+              onChange={handleChange}
               placeholder="Contoh: 001/002"
+              disabled={isFormDisabled}
             />
             <SelectField
               label="Tempat Tinggal"
@@ -886,6 +1095,7 @@ function App() {
               options={OPTIONS.tempatTinggal}
               required
               error={errors.tempatTinggal}
+              disabled={isFormDisabled}
             />
             <SelectField
               label="Moda Transportasi"
@@ -895,16 +1105,18 @@ function App() {
               options={OPTIONS.modaTransportasi}
               required
               error={errors.modaTransportasi}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Jarak Rumah ke Sekolah (km)" 
-              name="jarakSekolah" 
+            <InputField
+              label="Jarak Rumah ke Sekolah (km)"
+              name="jarakSekolah"
               type="number"
-              step="0.1" 
-              value={formData.jarakSekolah} 
-              onChange={handleChange} 
+              step="0.1"
+              value={formData.jarakSekolah}
+              onChange={handleChange}
               required
               error={errors.jarakSekolah}
+              disabled={isFormDisabled}
             />
             <SelectField
               label="Penerima KPS/PKH?"
@@ -912,60 +1124,63 @@ function App() {
               value={formData.penerimaKPS}
               onChange={handleChange}
               options={OPTIONS.pilihanYaTidak}
+              disabled={isFormDisabled}
             />
           </FormSection>
 
           {/* Data Orang Tua */}
           <FormSection title="Data Orang Tua" icon={<Users className="w-5 h-5" />}>
             <div className="md:col-span-2 text-lg font-semibold text-gray-700 border-b pb-2 mt-2 mb-4">Ayah Kandung</div>
-            
-            <InputField label="Nama Ayah" name="namaAyah" value={formData.namaAyah} onChange={handleChange} required error={errors.namaAyah} />
-            <InputField label="NIK Ayah" name="nikAyah" type="number" value={formData.nikAyah} onChange={handleChange} required error={errors.nikAyah} />
-            <InputField label="Tanggal Lahir Ayah" name="tanggalLahirAyah" type="date" value={formData.tanggalLahirAyah} onChange={handleChange} required error={errors.tanggalLahirAyah} />
-            <SelectField label="Pendidikan Terakhir" name="pendidikanAyah" value={formData.pendidikanAyah} onChange={handleChange} options={OPTIONS.pendidikan} required error={errors.pendidikanAyah} />
-            <InputField label="Pekerjaan Ayah" name="pekerjaanAyah" value={formData.pekerjaanAyah} onChange={handleChange} required error={errors.pekerjaanAyah} />
-            <SelectField label="Penghasilan Ayah" name="penghasilanAyah" value={formData.penghasilanAyah} onChange={handleChange} options={OPTIONS.penghasilan} required error={errors.penghasilanAyah} />
+
+            <InputField label="Nama Ayah" name="namaAyah" value={formData.namaAyah} onChange={handleChange} required error={errors.namaAyah} disabled={isFormDisabled} />
+            <InputField label="NIK Ayah" name="nikAyah" type="number" value={formData.nikAyah} onChange={handleChange} required error={errors.nikAyah} disabled={isFormDisabled} />
+            <InputField label="Tanggal Lahir Ayah" name="tanggalLahirAyah" type="date" value={formData.tanggalLahirAyah} onChange={handleChange} required error={errors.tanggalLahirAyah} disabled={isFormDisabled} />
+            <SelectField label="Pendidikan Terakhir" name="pendidikanAyah" value={formData.pendidikanAyah} onChange={handleChange} options={OPTIONS.pendidikan} required error={errors.pendidikanAyah} disabled={isFormDisabled} />
+            <InputField label="Pekerjaan Ayah" name="pekerjaanAyah" value={formData.pekerjaanAyah} onChange={handleChange} required error={errors.pekerjaanAyah} disabled={isFormDisabled} />
+            <SelectField label="Penghasilan Ayah" name="penghasilanAyah" value={formData.penghasilanAyah} onChange={handleChange} options={OPTIONS.penghasilan} required error={errors.penghasilanAyah} disabled={isFormDisabled} />
 
             <div className="md:col-span-2 text-lg font-semibold text-gray-700 border-b pb-2 mt-6 mb-4">Ibu Kandung</div>
 
-            <InputField label="Nama Ibu" name="namaIbu" value={formData.namaIbu} onChange={handleChange} required error={errors.namaIbu} />
-            <InputField label="NIK Ibu" name="nikIbu" type="number" value={formData.nikIbu} onChange={handleChange} required error={errors.nikIbu} />
-            <InputField label="Tanggal Lahir Ibu" name="tanggalLahirIbu" type="date" value={formData.tanggalLahirIbu} onChange={handleChange} required error={errors.tanggalLahirIbu} />
-            <SelectField label="Pendidikan Terakhir" name="pendidikanIbu" value={formData.pendidikanIbu} onChange={handleChange} options={OPTIONS.pendidikan} required error={errors.pendidikanIbu} />
-            <InputField label="Pekerjaan Ibu" name="pekerjaanIbu" value={formData.pekerjaanIbu} onChange={handleChange} required error={errors.pekerjaanIbu} />
-            <SelectField label="Penghasilan Ibu" name="penghasilanIbu" value={formData.penghasilanIbu} onChange={handleChange} options={OPTIONS.penghasilan} required error={errors.penghasilanIbu} />
+            <InputField label="Nama Ibu" name="namaIbu" value={formData.namaIbu} onChange={handleChange} required error={errors.namaIbu} disabled={isFormDisabled} />
+            <InputField label="NIK Ibu" name="nikIbu" type="number" value={formData.nikIbu} onChange={handleChange} required error={errors.nikIbu} disabled={isFormDisabled} />
+            <InputField label="Tanggal Lahir Ibu" name="tanggalLahirIbu" type="date" value={formData.tanggalLahirIbu} onChange={handleChange} required error={errors.tanggalLahirIbu} disabled={isFormDisabled} />
+            <SelectField label="Pendidikan Terakhir" name="pendidikanIbu" value={formData.pendidikanIbu} onChange={handleChange} options={OPTIONS.pendidikan} required error={errors.pendidikanIbu} disabled={isFormDisabled} />
+            <InputField label="Pekerjaan Ibu" name="pekerjaanIbu" value={formData.pekerjaanIbu} onChange={handleChange} required error={errors.pekerjaanIbu} disabled={isFormDisabled} />
+            <SelectField label="Penghasilan Ibu" name="penghasilanIbu" value={formData.penghasilanIbu} onChange={handleChange} options={OPTIONS.penghasilan} required error={errors.penghasilanIbu} disabled={isFormDisabled} />
           </FormSection>
 
           {/* Data Wali (Opsional) */}
           <FormSection title="Data Wali (Opsional)" icon={<User className="w-5 h-5" />}>
-             <InputField label="Nama Wali" name="namaWali" value={formData.namaWali} onChange={handleChange} />
-             <InputField label="NIK Wali" name="nikWali" type="number" value={formData.nikWali} onChange={handleChange} />
-             <InputField label="Tanggal Lahir Wali" name="tanggalLahirWali" type="date" value={formData.tanggalLahirWali} onChange={handleChange} />
-             <SelectField label="Pendidikan Terakhir" name="pendidikanWali" value={formData.pendidikanWali} onChange={handleChange} options={OPTIONS.pendidikan} />
-             <InputField label="Pekerjaan Wali" name="pekerjaanWali" value={formData.pekerjaanWali} onChange={handleChange} />
-             <SelectField label="Penghasilan Wali" name="penghasilanWali" value={formData.penghasilanWali} onChange={handleChange} options={OPTIONS.penghasilan} />
+             <InputField label="Nama Wali" name="namaWali" value={formData.namaWali} onChange={handleChange} disabled={isFormDisabled} />
+             <InputField label="NIK Wali" name="nikWali" type="number" value={formData.nikWali} onChange={handleChange} disabled={isFormDisabled} />
+             <InputField label="Tanggal Lahir Wali" name="tanggalLahirWali" type="date" value={formData.tanggalLahirWali} onChange={handleChange} disabled={isFormDisabled} />
+             <SelectField label="Pendidikan Terakhir" name="pendidikanWali" value={formData.pendidikanWali} onChange={handleChange} options={OPTIONS.pendidikan} disabled={isFormDisabled} />
+             <InputField label="Pekerjaan Wali" name="pekerjaanWali" value={formData.pekerjaanWali} onChange={handleChange} disabled={isFormDisabled} />
+             <SelectField label="Penghasilan Wali" name="penghasilanWali" value={formData.penghasilanWali} onChange={handleChange} options={OPTIONS.penghasilan} disabled={isFormDisabled} />
           </FormSection>
 
           {/* Kontak */}
           <FormSection title="Kontak & Berkas" icon={<Smartphone className="w-5 h-5" />}>
-            <InputField 
-              label="Nomor Whatsapp" 
-              name="noWhatsapp" 
+            <InputField
+              label="Nomor Whatsapp"
+              name="noWhatsapp"
               type="tel"
-              value={formData.noWhatsapp} 
-              onChange={handleChange} 
+              value={formData.noWhatsapp}
+              onChange={handleChange}
               placeholder="08xxxxxxxxxx"
               required
               error={errors.noWhatsapp}
+              disabled={isFormDisabled}
             />
-            <InputField 
-              label="Email" 
-              name="email" 
+            <InputField
+              label="Email"
+              name="email"
               type="email"
-              value={formData.email} 
-              onChange={handleChange} 
+              value={formData.email}
+              onChange={handleChange}
               required
               error={errors.email}
+              disabled={isFormDisabled}
               helperText={
                 <span className="block mt-1 space-y-1">
                   <span className="block">Pastikan email yang digunakan aktif dan dapat diakses. Bukti pendaftaran akan dikirim ke email Anda.</span>
@@ -977,54 +1192,70 @@ function App() {
 
             <div className="md:col-span-2 border-t my-4"></div>
 
-            <FileInputField 
-              label="Foto Calon Siswa" 
-              name="fileFoto" 
-              required 
-              onChange={handleFileChange} 
+            <FileInputField
+              label="Foto Calon Siswa"
+              name="fileFoto"
+              required
+              onChange={handleFileChange}
               accept="image/*"
               helperText="File Gambar (PDF/JPG/PNG), latar belakang merah/biru. Max 10MB"
               error={errors.fileFoto}
+              disabled={isFormDisabled}
             />
-            <FileInputField 
-              label="Kartu Keluarga (KK)" 
-              name="fileKK" 
-              required 
+            <FileInputField
+              label="Kartu Keluarga (KK)"
+              name="fileKK"
+              required
               onChange={handleFileChange}
               accept="image/*"
               helperText="File Gambar (PDF/JPG/PNG). Max 10MB"
               error={errors.fileKK}
+              disabled={isFormDisabled}
             />
-            <FileInputField 
-              label="Akta Kelahiran" 
-              name="fileAkta" 
-              required 
+            <FileInputField
+              label="Akta Kelahiran"
+              name="fileAkta"
+              required
               onChange={handleFileChange}
               accept="image/*"
               helperText="File Gambar (PDF/JPG/PNG). Max 10MB"
               error={errors.fileAkta}
+              disabled={isFormDisabled}
             />
-            <FileInputField 
-              label="Bukti Transfer Pendaftaran" 
-              name="fileTransfer" 
-              required 
-              onChange={handleFileChange} 
+            <FileInputField
+              label="Bukti Transfer Pendaftaran"
+              name="fileTransfer"
+              required
+              onChange={handleFileChange}
               accept="image/*"
               helperText="File Gambar (PDF/JPG/PNG). Pastikan nominal Rp 150.000,-. Max 10MB"
               error={errors.fileTransfer}
+              disabled={isFormDisabled}
             />
           </FormSection>
 
         {/* Submit Action */}
-        <div className="mt-8 flex flex-col items-center justify-center gap-4">
-          <button 
-            type="submit" 
-            className="bg-primary hover:bg-secondary text-white px-12 py-3 rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 w-full md:w-auto"
-          >
-            <Send className="w-5 h-5" />
-            Kirim Formulir
-          </button>
-        </div>
+        {!isKuotaTotalPenuh && (
+          <div className="mt-8 flex flex-col items-center justify-center gap-4">
+            <button
+              type="submit"
+              disabled={isFormDisabled}
+              className={`px-12 py-3 rounded-xl font-bold text-lg shadow-lg transition-all transform flex items-center justify-center gap-2 w-full md:w-auto ${
+                isFormDisabled
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed shadow-none'
+                  : 'bg-primary hover:bg-secondary text-white shadow-blue-500/30 hover:-translate-y-1'
+              }`}
+            >
+              <Send className="w-5 h-5" />
+              Kirim Formulir
+            </button>
+            {isGenderBlocked && (
+              <p className="text-sm text-red-500 font-medium">
+                Tombol kirim tidak aktif karena kuota {selectedGender} sudah penuh.
+              </p>
+            )}
+          </div>
+        )}
       </form>
     </div>
   );
