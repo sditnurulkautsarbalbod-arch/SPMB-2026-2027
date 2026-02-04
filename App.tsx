@@ -139,10 +139,18 @@ function App() {
 
   // 6. Show Notification Modal on Form View
   useEffect(() => {
-    if (currentView === 'form' && notificationSettings.isActive) {
-      setShowUserNotification(true);
-      if (notificationSettings.type === 'blocking') {
-        setIsFormBlocked(true);
+    if (currentView === 'form') {
+      if (notificationSettings.isActive) {
+        setShowUserNotification(true);
+        if (notificationSettings.type === 'blocking') {
+          setIsFormBlocked(true);
+        } else {
+          setIsFormBlocked(false);
+        }
+      } else {
+        // Reset states when notification is disabled
+        setShowUserNotification(false);
+        setIsFormBlocked(false);
       }
     }
   }, [currentView, notificationSettings]);
@@ -1281,6 +1289,10 @@ function App() {
           notification={notificationSettings}
           onClose={handleCloseUserNotification}
           isBlocked={isFormBlocked}
+          onAdminLogin={() => {
+            setShowUserNotification(false);
+            setCurrentView('login');
+          }}
         />
       )}
     </div>
