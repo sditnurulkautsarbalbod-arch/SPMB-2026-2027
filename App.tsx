@@ -19,7 +19,7 @@ import {
 
 // --- CONFIGURATION ---
 // PASTE YOUR GOOGLE WEB APP URL HERE
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAGBga2GnD2FgJtjAxdDACaJ0gHG4o9io418RSYMckxoajiX6TP2mmvZY_UA9veYmB/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwHedOP5n0NyZED3NmQ4Zw2wPH3CT-PrEKdEaEZQ-V3liNBubM0lwEozCiM3Np9Bc6y/exec"; 
 
 const STORAGE_KEY = 'spmb_form_data';
 const DASHBOARD_CACHE_KEY = 'spmb_dashboard_cache'; // Key untuk cache dashboard
