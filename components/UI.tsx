@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, Info, Upload, X, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, Upload, X, AlertTriangle, Settings } from 'lucide-react';
 import { NotificationSettings } from '../types';
 
 // --- Types ---
@@ -283,7 +283,8 @@ export const UserNotificationModal: React.FC<{
   notification: NotificationSettings;
   onClose: () => void;
   isBlocked: boolean;
-}> = ({ notification, onClose, isBlocked }) => {
+  onAdminLogin?: () => void;
+}> = ({ notification, onClose, isBlocked, onAdminLogin }) => {
   if (!notification.isActive) return null;
 
   const isBlocking = notification.type === 'blocking';
@@ -293,6 +294,17 @@ export const UserNotificationModal: React.FC<{
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-fade-in-up relative overflow-hidden">
         {/* Decorative top bar */}
         <div className={`absolute top-0 left-0 w-full h-2 ${isBlocking ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+
+        {/* Admin login button - only for blocking type */}
+        {isBlocking && onAdminLogin && (
+          <button
+            onClick={onAdminLogin}
+            className="absolute top-4 right-4 p-2 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+            title="Admin Login"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Close button - only for info type */}
         {!isBlocking && (
