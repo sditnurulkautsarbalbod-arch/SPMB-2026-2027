@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, Info, Upload } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, Upload, RefreshCw, Users } from 'lucide-react';
 
 // --- Types ---
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -37,15 +37,16 @@ export const FormSection: React.FC<{ title: string; icon?: React.ReactNode; chil
   </div>
 );
 
-export const InputField: React.FC<InputProps> = ({ label, error, required, className, helperText, ...props }) => (
+export const InputField: React.FC<InputProps> = ({ label, error, required, className, helperText, disabled, ...props }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-sm font-semibold text-gray-700">
+    <label className={`text-sm font-semibold ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     <input
       className={`px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-all ${
         error ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-      } ${className}`}
+      } ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${className}`}
+      disabled={disabled}
       {...props}
     />
     {helperText && <div className="text-xs text-gray-500 mt-1">{helperText}</div>}
@@ -53,16 +54,17 @@ export const InputField: React.FC<InputProps> = ({ label, error, required, class
   </div>
 );
 
-export const SelectField: React.FC<SelectProps> = ({ label, options, error, required, ...props }) => (
+export const SelectField: React.FC<SelectProps> = ({ label, options, error, required, disabled, ...props }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-sm font-semibold text-gray-700">
+    <label className={`text-sm font-semibold ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     <div className="relative">
       <select
         className={`w-full px-4 py-2 rounded-lg border appearance-none bg-white focus:outline-none focus:ring-2 transition-all ${
           error ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-        }`}
+        } ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+        disabled={disabled}
         {...props}
       >
         <option value="">-- Pilih --</option>
@@ -82,10 +84,11 @@ export const SelectField: React.FC<SelectProps> = ({ label, options, error, requ
   </div>
 );
 
-export const FileInputField: React.FC<FileInputProps> = ({ label, error, required, helperText, onChange, ...props }) => {
+export const FileInputField: React.FC<FileInputProps> = ({ label, error, required, helperText, onChange, disabled, ...props }) => {
   const [fileName, setFileName] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     // Jalankan onChange dari parent (App.tsx) terlebih dahulu untuk validasi
     if (onChange) onChange(e);
 
@@ -100,28 +103,30 @@ export const FileInputField: React.FC<FileInputProps> = ({ label, error, require
 
   return (
     <div className="flex flex-col gap-2 md:col-span-2">
-      <label className="text-sm font-semibold text-gray-700">
+      <label className={`text-sm font-semibold ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>
         {label} {required && <span className="text-red-500">*</span>}
       </label>
-      
+
       <div className={`flex items-center justify-between p-3 border rounded-xl transition-all duration-200 ${
-        error 
-          ? 'border-red-300 bg-red-50' 
-          : fileName 
-            ? 'border-green-500 bg-green-50 ring-1 ring-green-500' 
-            : 'border-gray-300 bg-white hover:border-primary hover:shadow-sm'
+        disabled
+          ? 'border-gray-200 bg-gray-100'
+          : error
+            ? 'border-red-300 bg-red-50'
+            : fileName
+              ? 'border-green-500 bg-green-50 ring-1 ring-green-500'
+              : 'border-gray-300 bg-white hover:border-primary hover:shadow-sm'
       }`}>
         <div className="flex items-center gap-3 overflow-hidden pr-2">
           <div className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
-            fileName ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+            disabled ? 'bg-gray-200 text-gray-400' : fileName ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
           }`}>
             {fileName ? <CheckCircle className="w-5 h-5" /> : <Upload className="w-5 h-5" />}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className={`text-sm font-medium truncate ${fileName ? 'text-gray-900' : 'text-gray-500'}`}>
+            <span className={`text-sm font-medium truncate ${disabled ? 'text-gray-400' : fileName ? 'text-gray-900' : 'text-gray-500'}`}>
               {fileName || 'Belum ada file dipilih'}
             </span>
-            {fileName && (
+            {fileName && !disabled && (
               <span className="text-xs text-green-600 font-bold flex items-center gap-1 animate-pulse">
                 Berhasil Upload
               </span>
@@ -129,27 +134,136 @@ export const FileInputField: React.FC<FileInputProps> = ({ label, error, require
           </div>
         </div>
 
-        <label className="flex-shrink-0">
-          <span className={`cursor-pointer inline-flex items-center px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
-            fileName
-              ? 'text-gray-500 hover:text-gray-700 bg-transparent'
-              : 'bg-primary text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 hover:shadow-blue-500/40'
+        <label className={`flex-shrink-0 ${disabled ? 'cursor-not-allowed' : ''}`}>
+          <span className={`inline-flex items-center px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+            disabled
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : fileName
+                ? 'cursor-pointer text-gray-500 hover:text-gray-700 bg-transparent'
+                : 'cursor-pointer bg-primary text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 hover:shadow-blue-500/40'
           }`}>
             {fileName ? 'Ganti' : 'Pilih File'}
           </span>
-          <input 
-            type="file" 
-            className="sr-only" 
-            onChange={handleFileChange} 
-            {...props} 
+          <input
+            type="file"
+            className="sr-only"
+            onChange={handleFileChange}
+            disabled={disabled}
+            {...props}
           />
         </label>
       </div>
-      
+
       <div className="flex justify-between items-start px-1">
         <span className="text-xs text-gray-400">{helperText}</span>
         {error && <span className="text-xs font-semibold text-red-500">{error}</span>}
       </div>
+    </div>
+  );
+};
+
+// --- Quota Status Card ---
+interface QuotaStatusCardProps {
+  kuotaLaki: number;
+  kuotaPerempuan: number;
+  kuotaTotal: number;
+  terisiLaki: number;
+  terisiPerempuan: number;
+  terisiTotal: number;
+  isLoading: boolean;
+  onRefresh: () => void;
+}
+
+const ProgressBar: React.FC<{
+  label: string;
+  terisi: number;
+  total: number;
+  colorClass: string;
+  colorFull: string;
+}> = ({ label, terisi, total, colorClass, colorFull }) => {
+  const sisa = total - terisi;
+  const percentage = Math.min((terisi / total) * 100, 100);
+  const isFull = sisa <= 0;
+
+  return (
+    <div className="flex-1">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-semibold text-gray-700">{label}</span>
+        <span className={`text-sm font-bold ${isFull ? 'text-red-600' : 'text-gray-600'}`}>
+          {terisi} / {total} <span className="text-xs font-normal">({sisa > 0 ? `Sisa ${sisa}` : 'Penuh'})</span>
+        </span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+        <div
+          className={`h-3 rounded-full transition-all duration-500 ${isFull ? colorFull : colorClass}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+export const QuotaStatusCard: React.FC<QuotaStatusCardProps> = ({
+  kuotaLaki,
+  kuotaPerempuan,
+  kuotaTotal,
+  terisiLaki,
+  terisiPerempuan,
+  terisiTotal,
+  isLoading,
+  onRefresh
+}) => {
+  const sisaTotal = kuotaTotal - terisiTotal;
+  const isTotalFull = sisaTotal <= 0;
+
+  return (
+    <div className={`p-6 rounded-xl shadow-sm border mb-8 ${isTotalFull ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className={`p-2 rounded-full ${isTotalFull ? 'bg-red-100' : 'bg-blue-100'}`}>
+            <Users className={`w-5 h-5 ${isTotalFull ? 'text-red-600' : 'text-blue-600'}`} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-800">Status Kuota Pendaftaran</h3>
+            <p className="text-xs text-gray-500">
+              Total: <span className={`font-semibold ${isTotalFull ? 'text-red-600' : 'text-gray-700'}`}>{terisiTotal} / {kuotaTotal}</span>
+              {sisaTotal > 0 ? ` (Sisa ${sisaTotal} kursi)` : ' - KUOTA PENUH'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={isLoading}
+          className="p-2 text-gray-500 hover:text-primary hover:bg-blue-50 rounded-full transition-colors disabled:opacity-50"
+          title="Refresh Kuota"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-4 text-gray-500 text-sm">
+          <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+          Memuat data kuota...
+        </div>
+      ) : (
+        <div className="flex flex-col md:flex-row gap-4">
+          <ProgressBar
+            label="Laki-laki"
+            terisi={terisiLaki}
+            total={kuotaLaki}
+            colorClass="bg-blue-500"
+            colorFull="bg-red-500"
+          />
+          <ProgressBar
+            label="Perempuan"
+            terisi={terisiPerempuan}
+            total={kuotaPerempuan}
+            colorClass="bg-pink-500"
+            colorFull="bg-red-500"
+          />
+        </div>
+      )}
     </div>
   );
 };
