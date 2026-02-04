@@ -19,7 +19,7 @@ import {
 
 // --- CONFIGURATION ---
 // PASTE YOUR GOOGLE WEB APP URL HERE
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwMCwbpA_gtLLaQB7N-oIYskdBs0RGpG8bPG6KUVBz4CL8rH11Rf4VDEURlLp-tCyGK/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAGBga2GnD2FgJtjAxdDACaJ0gHG4o9io418RSYMckxoajiX6TP2mmvZY_UA9veYmB/exec"; 
 
 const STORAGE_KEY = 'spmb_form_data';
 const DASHBOARD_CACHE_KEY = 'spmb_dashboard_cache'; // Key untuk cache dashboard
@@ -124,17 +124,9 @@ function App() {
     }
   }, [currentView]);
 
-  // 5. Load Notification Settings
+  // 5. Load Notification Settings from Server
   useEffect(() => {
-    const savedNotification = localStorage.getItem(NOTIFICATION_KEY);
-    if (savedNotification) {
-      try {
-        const parsed = JSON.parse(savedNotification);
-        setNotificationSettings(parsed);
-      } catch (e) {
-        console.error("Gagal load notification settings", e);
-      }
-    }
+    fetchNotificationSettings();
   }, []);
 
   // 6. Show Notification Modal on Form View
@@ -163,6 +155,57 @@ function App() {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = error => reject(error);
     });
+  };
+
+  // Fetch Notification Settings from Server
+  const fetchNotificationSettings = async () => {
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("PASTE_")) {
+      // Fallback to localStorage if URL not set
+      const savedNotification = localStorage.getItem(NOTIFICATION_KEY);
+      if (savedNotification) {
+        try {
+          const parsed = JSON.parse(savedNotification);
+          setNotificationSettings(parsed);
+        } catch (e) {
+          console.error("Gagal load notification settings", e);
+        }
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getNotification`, {
+        method: 'GET',
+        redirect: 'follow'
+      });
+
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.warn("Notification response is not JSON:", responseText);
+        return;
+      }
+
+      if (data.result === 'success' && data.notification) {
+        setNotificationSettings(data.notification);
+        // Also cache to localStorage
+        localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(data.notification));
+      }
+    } catch (error) {
+      console.error("Error fetching notification settings:", error);
+      // Fallback to localStorage
+      const savedNotification = localStorage.getItem(NOTIFICATION_KEY);
+      if (savedNotification) {
+        try {
+          const parsed = JSON.parse(savedNotification);
+          setNotificationSettings(parsed);
+        } catch (e) {
+          console.error("Gagal load notification settings from cache", e);
+        }
+      }
+    }
   };
 
   const fetchSubmissions = async () => {
@@ -438,9 +481,59 @@ function App() {
     setNotificationSettings(prev => ({ ...prev, [field]: value }));
   };
 
-  const saveNotificationSettings = () => {
+  const [isSavingNotification, setIsSavingNotification] = useState(false);
+
+  const saveNotificationSettings = async () => {
+    // Always save to localStorage as cache
     localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notificationSettings));
-    alert('Pengaturan notifikasi berhasil disimpan!');
+
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("PASTE_")) {
+      alert('Pengaturan notifikasi berhasil disimpan (lokal)!');
+      return;
+    }
+
+    setIsSavingNotification(true);
+    try {
+      const payload = {
+        action: "saveNotification",
+        notification: notificationSettings
+      };
+
+      console.log("Saving notification to server:", payload);
+
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        redirect: 'follow'
+      });
+
+      const responseText = await response.text();
+      console.log("Server response:", responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Server returned non-JSON response:", responseText);
+        throw new Error("Respon server tidak valid.");
+      }
+
+      console.log("Parsed response:", data);
+
+      if (data.result === 'error') {
+        throw new Error(data.message || "Terjadi kesalahan pada server.");
+      }
+
+      alert('Pengaturan notifikasi berhasil disimpan ke server!');
+    } catch (error: any) {
+      console.error("Error saving notification:", error);
+      alert(`Gagal menyimpan ke server: ${error.message}. Pengaturan disimpan lokal.`);
+    } finally {
+      setIsSavingNotification(false);
+    }
   };
 
   const handleCloseUserNotification = () => {
@@ -890,10 +983,20 @@ function App() {
                 {/* Save Button */}
                 <button
                   onClick={saveNotificationSettings}
-                  className="w-full bg-primary hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+                  disabled={isSavingNotification}
+                  className="w-full bg-primary hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  <Save className="w-5 h-5" />
-                  Simpan Pengaturan
+                  {isSavingNotification ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      Simpan Pengaturan
+                    </>
+                  )}
                 </button>
               </div>
             </div>
